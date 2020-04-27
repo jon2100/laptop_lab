@@ -1,8 +1,4 @@
 My Laptop Lab  
-Specs of my lapotp
-Lenovo T480s  
-  - 24GB RAM  
-  - 1TB EVO Pro m2 nvme 2280  
-Fedroa 29
-kvm 2.1.0
+- build and what I have running found here https://github.com/jon2100/laptop_lab/wiki
+
 
