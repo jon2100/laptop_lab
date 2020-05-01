@@ -1,0 +1,220 @@
+[bastion]
+bastion.example.com
+
+[masters]
+## single master uncomment and cahnge name apprrately and if crio use that option
+# master01.example.com openshift_node_group_name="node-config-master"
+## multiple masters
+# master0[1:3].example.com openshift_node_group_name='node-config-master'
+## For CRIO
+# master01.example.com openshift_node_group_name='node-config-master-crio'
+
+[infra]
+## Single infranode
+# infranode01.example.com openshift_node_group_name="node-config-infra"
+## Multi infra node
+# infranode0[1:3] openshift_node_group_name="node-config-infra"
+# Crio infranode
+# infranode01.example.com openshift_node_group_name='node-config-infra-crio'
+
+[compute]
+## single compute node
+# computenode01.example.com openshift_node_group_name='node-config-compute'
+## Multiple compute node
+# computenode0[1:3] openshift_node_group_name='node-config-compute'
+## CRIO compute node
+# nodeic02.example.com openshift_node_group_name='node-config-infra'
+
+
+[new_nodes]
+## used to scale up nodes
+
+[etcd:children]
+masters
+
+[nodes:children]
+masters
+infra
+compute
+
+## Sets Environment to be used 
+[lab:children]
+OSEv3
+bastion
+
+[OSEv3:children]
+masters
+nodes
+etcd
+new_nodes
+
+[OSEv3:vars]
+ansible_user={{ SETUP_USER }}
+ansible_become = yes
+
+openshift_deployment_type=openshift-enterprise
+
+# Set openshift and componet versions
+openshift_release={{ OCP_VER }}
+openshift_pkg_version={{ OCP_PKG_VER }}
+openshift_image_tag={{ OCP_IMG_VER }}
+docker_version={{ DOCKERVER }}
+
+# Openshift registery hosted
+openshift_hosted_docker_registry_selector='node-role.kubernetes.io/infra=true'
+openshift_hosted_docker_registery_insecure_default=false
+
+# Openshift registry selectory
+# openshift_registry_selector='node-role.kubernetes.io/master=true'
+openshift_hosted_registry_replicas=1
+openshift_managed_registry=true
+openshift_hosted_manage_registry_console=true
+
+openshift_use_system_containers=true
+
+# Get these from https://access.redhat.com/terms-based-registry/
+### Enable for Connected Install 
+#system_images_registry= {{ REG_SRV }}
+# oreg_auth_user: {{ OREGUSR }}
+# oreg_auth_password: {{ OREGTOKEN }} 
+
+#### Enable for Disconnected Install
+oreg_url={{ REG_SRV }}/openshift3/ose-${component}:${version}
+openshift_examples_modify_imagestreams=true
+
+# Image Repos to use
+openshift_docker_options="--selinux-enabled --log-driver=json-file --signature-verification=false"
+openshift_docker_additional_registries=["docker-registry.default.svc:5000", "{{ REG_SRV }}"]
+openshift_docker_blocked_registries="docker.io"
+
+
+# AUTH
+openshift_master_ldap_ca_file={{ LDAPCA }}
+# Source Ldap
+# openshift_master_identity_providers=[{'name': 'Source Account', 'login': 'true', 'challenge': 'true', 'kind': 'HTPasswdPasswordIdentityProvider'}, {'name': 'AD Account', 'login': 'true', 'challenge': 'true', 'kind': 'LDAPPasswordIdentityProvider', 'attributes': {'id': ['sAMAccountName'], 'email': ['mail'], 'name': ['cn']}, 'bindDN': '{{ BINDADDN }}', 'bindPassword': 'M0nk3yM4n1', 'insecure': 'true', 'url': '{{ URLFILTER }}'}]
+
+# cust ldap
+openshift_master_identity_providers=[{'name': 'Source Account', 'login': 'true', 'challenge': 'true', 'kind': 'HTPasswdPasswordIdentityProvider'}, {'name': 'AD Account', 'login': 'true', 'challenge': 'true', 'kind': 'LDAPPasswordIdentityProvider', 'attributes': {'id': ['sAMAccountName'], 'email': ['mail'], 'name': ['cn']}, 'bindDN': '{{ BINDADDN }}', 'bindPassword': {'file': 'bindPassword.encrypted', 'keyFile': 'bindPassword.key'}, 'insecure': 'false', 'url': '{{ URLFILTER }}'}]
+
+#Examples:
+# openahift_master_idntity_providers=[{'name': 'ldap_auth', 'login': 'ture', 'challange': 'true',  'kind': 'LDAPPasswordIdentityProvider'
+# openshift_master_identity_providers=[{'name': 'OpenShift Internal', 'login': 'true', 'challenge': 'true', 'kind': 'HTPasswdPasswordIdentityProvider'},{'name': 'Sempra Active Directory', 'challenge': 'true', 'login': 'true', 'kind': 'LDAPPasswordIdentityProvider', 'attributes': {'id': ['sAMAccountName'], 'email': ['mail'], 'name': ['displayName'], 'preferredUsername': ['sAMAccountName']}, 'bindDN': 'CN=SV-OpnShft-T,OU=Service Accounts,OU=CSC Managed Users,DC=corp,DC=SE,DC=sempra,DC=com', 'bindPassword': 'billiy', 'insecure': 'true', 'url': 'ldap://172.16.171.23/DC=corp,DC=SE,DC=sempra,DC=com?sAMAccountName?sub?(memberOf=CN=SDGESITeam,OU=Distribution Groups,OU=Users,OU=Messaging,DC=corp,DC=SE,DC=sempra,DC=com)'}]
+
+
+# openshift_master_identity_providers=[{'name': 'htpasswd_auth', 'login': 'true', 'challenge': 'true', 'kind': 'HTPasswdPasswordIdentityProvider'}]
+# admin:redhat
+openshift_master_htpasswd_users={'admin': '{{ HTPASS }}', 'clusteradmin': '{{ HTPASS }}'}
+
+# Change this to a DNS name that resolves to your VM's IP address, or
+# use /etc/hosts
+openshift_master_default_subdomain={{ SUBDOM }}
+openshift_master_cluster_public_hostname={{ CLUSTPUB }}
+openshift_master_cluster_hostname={{ CLUSTINT }}
+opeshift_console_hostname={{ CLUSTCON }}
+
+
+
+openshift_master_api_port=443
+openshift_master_console_port=443
+
+# CUSTOM: enabled firewalld
+os_firewall_use_firewalld=true
+# open ports on the firewall
+# Change ports as needed
+openshift_node_open_ports=[{"service": "snmp","port":"161/udp",},{"service": "prometheus_node_exporter","port":"9100/tcp",},{"service":"haproxy_health_check","port":"1936/tcp"},{"service":"cri-o","port":"10010/tcp"}]
+
+## For Labs 
+openshift_disable_check=memory_availability,disk_availability,cpu_availablity
+
+# If there is nothign setting up docker volumes use these settings 
+container_runtime_docker_storage_setup_device='/dev/vdb'
+container_runtime_docker_storage_type='overlay2'
+
+# Webconsole and TLS vers 1.2 ciphers for API 
+openshift_master_min_tls_version=VersionTLS12
+# Install Web Console
+openhift_we_sonsole_install=true
+# WebCon version 
+openshift_web_sonsole_version={{ COMPONETVER }}
+
+# Networking settings 
+# defalts to 172.30.0.0/16 if not declared 
+openshift_portal_net=172.30.0.0/16
+# Internal SDN 
+openshift_cluster_network_cidr=10.32.0.0/16
+# CIDER for pods ips  ** cannot be redone after deployment
+osm_host_subnet_length=9
+# MTU Setting Defalt for most envs 
+openshift_node_sdn_mtu=1450
+# Network Plug-in to use (you can use network policy for mulit tenent)
+os_sdn_network_plugin_name=redhat/openshift-ovs-networkpolicy
+
+# Install and run cri-o. uncomment if using crio
+# openshift_use_crio=True
+# openshift_use_crio_only=False
+# openshift_crio_enable_docker_gc=True
+# openshift_crio_docker_gc_node_selector={"node-role.kubernetes.io/compute":"true"}
+
+# openshift_hosted_prometheus_deploy=true
+openshift_prometheus_namespace=openshift-metrics
+openshift_prometheus_node_selector={"node-role.kubernetes.io/infra":"true"}
+openshift_metrics_hawkular_nodeselector={'node-role.kubernetes.io/infra':'true'}
+openshift_metrics_cassandra_nodeselector={'node-role.kubernetes.io/infra':'true'}
+openshift_metrics_heapster_nodeselector={'node-role.kubernetes.io/infra':'true'}
+openshift_metrics_hawkular_agent_nodeselector={'node-role.kubernetes.io/infra':'true'}
+
+# Metrics 
+openshift_metrics_server_install=true
+openshift_metrics_server_version={{ COMPONETVER }}
+
+# Currently logging deployment is disabled by default, enable it by setting this
+openshift_logging_install_logging=true
+openshift_logging_es_nodeselector={'node-role.kubernetes.io/infra':'true'}
+openshift_logging_es_memory_limit={{ ESMEMLIMIT }}
+# uncomment if more that 1 infra node and masters
+#openshift_logging_kibana_nodeselector='node-role.kubernetes.io/infra=true'
+#openshift_logging_curator_nodeselector='node-role.kubernetes.io/infra=true'
+#openshift_logging_eventrouter_nodeselector='node-role.kubernetes.io/infra=true'
+openshift_logging_install_eventrouter=true
+openshift_logging_curatator_default_days=1
+openshift_logging_elasticsearch_replace_configmap=true
+
+openshift_master_audit_config={"auditFilePath": "/etc/origin/master/master-audit-ocp.log", "enabled": true, "maximumFileRetentionDays": 30, "maximumFileSizeMegabytes": 500, "maximumRetainedFiles": 2}
+
+# Logging Componet Versions
+openshift_logging_eventrouter_image={{ REG_SRV }}/openshift3/ose-logging-eventrouter:{{ OCP_IMG_VER }}
+openshift_logging_eventrouter_image_version={{ OCP_IMG_VER }}
+openshift_logging_curator_image={{ REG_SRV }}/openshift3/ose-logging-curator5:{{ OCP_IMG_VER }}
+openshift_logging_kibana_image={{ REG_SRV }}/openshift3/ose-logging-kibana5:{{ OCP_IMG_VER }}
+openshift_logging_kibana_proxy_image={{ REG_SRV }}/openshift3/oauth-proxy:{{ OCP_IMG_VER }}
+openshift_logging_fluentd_image={{ REG_SRV }}/openshift3/ose-logging-fluentd:{{ OCP_IMG_VER }}
+# openshift_logging_fluentd_image={{ REG_SRV }}/openshift3/ose-logging-fluentd:v3.11
+openshift_logging_elasticsearch_image={{ REG_SRV }}/openshift3/ose-logging-elasticsearch5:{{ OCP_IMG_VER }}
+openshift_logging_elasticsearch_replace_configmap=true
+
+## Short node group names
+#openshift_node_groups=[{"name": "node-config-master", "labels": ["node-role.kubernetes.io/master=true"], "edits": []}, {"name": "node-config-infra", "labels": ["node-role.kubernetes.io/infra=true"], "edits": []}, {"name": "node-config-glusterfs", "labels": ["node-role.kubernetes.io/glusterfs=true"],"edits": []}, {"name": "node-config-compute", "labels": ["node-role.kubernetes.io/compute=true"], "edits": []}, {"name": "node-config-master-infra", "labels": ["node-role.kubernetes.io/master=true", "node-role.kubernetes.io/infra=true"], "edits": []}]
+
+## Long node group names covers gluster / crio / docker
+## Node Groups
+openshift_node_groups=[{"name": "node-config-master", "labels": ["node-role.kubernetes.io/master=true"], "edits": []}, {"name": "node-config-master-crio", "labels": ["node-role.kubernetes.io/master=true", "{{ openshift_crio_docker_gc_node_selector | lib_utils_oo_dict_to_keqv_list |\njoin(',') }}"], "edits": "{{ openshift_node_group_edits_crio }}"}, {"name": "node-config-infra", "labels": ["node-role.kubernetes.io/infra=true"], "edits": []}, {"name": "node-config-infra-crio", "labels": ["node-role.kubernetes.io/infra=true", "{{ openshift_crio_docker_gc_node_selector | lib_utils_oo_dict_to_keqv_list |\njoin(',') }}"], "edits": "{{ openshift_node_group_edits_crio }}"}, {"name": "node-config-glusterfs", "labels": ["node-role.kubernetes.io/glusterfs=true"], "edits": []}, {"name": "node-config-compute", "labels": ["node-role.kubernetes.io/compute=true"], "edits": []}, {"name": "node-config-compute-crio", "labels": ["node-role.kubernetes.io/compute=true", "{{ openshift_crio_docker_gc_node_selector | lib_utils_oo_dict_to_keqv_list |\njoin(',') }}"], "edits": "{{ openshift_node_group_edits_crio }}"}, {"name": "node-config-master-infra", "labels": ["node-role.kubernetes.io/master=true", "node-role.kubernetes.io/infra=true"], "edits": []}, {"name": "node-config-master-infra-crio", "labels": ["node-role.kubernetes.io/master=true", "node-role.kubernetes.io/infra=true", "{{ openshift_crio_docker_gc_node_selector | lib_utils_oo_dict_to_keqv_list |\njoin(',') }}"],"edits": "{{ openshift_node_group_edits_crio }}"},{"name": "node-config-all-in-one","labels": ["node-role.kubernetes.io/master=true", "node-role.kubernetes.io/infra=true", "node-role.kubernetes.io/compute=true"], "edits": []}, {"name": "node-config-all-in-one-crio", "labels": ["node-role.kubernetes.io/master=true", "node-role.kubernetes.io/infra=true", "node-role.kubernetes.io/compute=true", "{{ openshift_crio_docker_gc_node_selector | lib_utils_oo_dict_to_keqv_list |\njoin(',') }}"], "edits": "{{ openshift_node_group_edits_crio }}"}]
+
+
+# Project Template
+# Default project request template with resource limits and NetworkPolicies.
+openshift_project_request_template_namespace=default
+openshift_project_request_template_name=project-request
+openshift_project_request_template_manage=True
+osm_project_request_template=default/project-request
+
+## Template can be modifed to suit
+openshift_project_request_template_edits=[{"key": "objects", "action": "append", "value": {"apiVersion": "v1", "kind": "ResourceQuota", "metadata": {"annotations": {"openshift.io/quota-tier": "Small"}, "labels": {"quota-tier": "Small"}, "name": "compute"}, "spec": {"hard": {"cpu": "1", "memory": "1Gi"}, "scopes": ["NotTerminating"]}}}, {"key": "objects", "action": "append", "value": {"apiVersion": "v1", "kind": "LimitRange", "metadata": {"annotations": {"openshift.io/quota-tier": "Small"}, "labels": {"quota-tier": "Small"}, "name": "limits"}, "spec": {"limits": [{"max": {"cpu": "200m", "memory": "1Gi"}, "min": {"cpu": "10m", "memory": "4Mi"}, "type": "Pod"}, {"default": {"cpu": "50m", "memory": "256Mi"}, "max": {"cpu": "200m", "memory": "1Gi"}, "maxLimitRequestRatio": {"cpu": "10"}, "min": {"cpu": "20m", "memory": "256Mi"}, "type": "Container"}]}}}, {"key": "objects", "action": "append", "value": {"apiVersion": "v1", "kind": "EgressNetworkPolicy", "metadata": {"name": "deny-external-egress"}, "spec": {"egress": [{"type": "Deny", "to": {"cidrSelector": "0.0.0.0/0"}}]}}}, {"key": "objects", "action": "append", "value": {"kind": "NetworkPolicy", "apiVersion": "extensions/v1beta1", "metadata": {"name": "deny-from-all-namespaces"}, "spec": {"podSelector": {}}}}, {"key": "objects", "action": "append", "value": {"apiVersion": "extensions/v1beta1", "kind": "NetworkPolicy", "metadata": {"name": "allow-from-same-namespace"},"spec": {"podSelector": null, "ingress": [{"from": [{"podSelector": {}}]}]}}}, {"key": "objects", "action": "append", "value": {"kind": "NetworkPolicy", "apiVersion": "extensions/v1beta1", "metadata": {"name": "allow-from-default-namespace"}, "spec": {"podSelector": null, "ingress": [{"from": [{"namespaceSelector": {"matchLabels": {"name": "default"}}}]}]}}}]
+
+#testing
+openshift_enable_service_catalog=false
+template_service_broker_install=false
+
+
+
+
+### Config your inventory section of docs ####
