@@ -102,8 +102,8 @@ openshift_master_identity_providers=[{'name': 'Source Account', 'login': 'true',
 
 
 # openshift_master_identity_providers=[{'name': 'htpasswd_auth', 'login': 'true', 'challenge': 'true', 'kind': 'HTPasswdPasswordIdentityProvider'}]
-# admin:redhat
-openshift_master_htpasswd_users={'admin': '{{ HTPASS }}', 'clusteradmin': '{{ HTPASS }}'}
+
+openshift_master_htpasswd_users={'admin': '{{ HTPASS }}'}
 
 # Change this to a DNS name that resolves to your VM's IP address, or
 # use /etc/hosts
