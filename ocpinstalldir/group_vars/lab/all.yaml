@@ -1,0 +1,66 @@
+RHN_USERNAME: <rhel portal username>
+RHN_PASSWORD: <portal password>
+RHN_SUB_COMPUT_POOL: <pool>
+RHN_SUB_MASTERINFRA_POOL: <pull>
+
+# redhat is the password
+HTPASS: <htpasswd encrypted password> 
+
+SETUP_USER: <install admin user>
+
+# if using LDAP Auth Provide infor below 
+# If ldap then change filter to reflect ldap vs ldaps
+
+URLFILTER: ldaps://example.com/DC=exmple,DC=com?sAMAccountName?sub?(|(memberOf=CN=OCP-Admins,OU=SITE-ADMIN,OU=Groups,DC=example,DC=com)(memberOf=CN=OPS-ADMINs,OU=SITE-ADMINS,OU=Groups,DC=example,DC=com))
+
+BINDADDN: CN=OCP-Service-Acct,OU=Site,OU=Service Accounts,DC=example,DC=com
+
+# if using ldaps
+LDAPCA: ~/ocpinstall/files/ad_ca.pem
+
+
+# OREG Settings 
+# if using local repo server, OREGUSR and Token are not used
+REG_SRV: internal.repo.server
+
+#REG_SRV: registry.redhat.io
+#OREGUSR: <service account setup @ registry.redhat.io>
+#OREGTOKEN: <token >
+
+# CLuser CERTS
+# MASTERCRT: <path/to/cert/>
+# MASTERKEY: <path/to/key>
+# CACERT: <path/to/ca>
+# ROUTERCRT: <path/to/cert>
+
+
+#GLUSTER Uniqe per cluster
+#GLBKSZ: <some number of gigs>
+#GLSTORNAME: <name for storage class name appstore etc...>
+#Set True for Dynamic File Store provisioning 
+#GLSETDEFT: true
+
+# Logging 
+# ESVPSIZE: <some xGi number>
+# ESCLSIZE: <1 default set anyenv above dev to 3>
+# ESREPLCA: <1 default set anyenv about dev to 2>
+# ESMEMLIMIT: <Set mem limit 2Gi lab 16Gi envs above>
+
+#URL's for clsuter
+SUBDOM: ocpappsc.example.com
+CLUSTCON: console.ocpappsc.example.com
+CLUSTINT: openshift-int.example.com
+CLUSTPUB: openshift.example.com
+
+# Versions: Openshift and Package Versions
+OCP_PKG_VER: -3.11.200
+OCP_IMG_VER: v3.11.200
+OCP_VER: 3.11
+DOCKERVER: 1.13.1
+COMPONETVER: v3.11
+
+# Internal Clsuter Registry Size
+# If there is avaliable presistan storage
+# Size represented in Gi
+# REGSIZE: 5Gi
+
