@@ -1,0 +1,217 @@
+openshift_clusters:
+- openshift_host_env: "{{ openshift_master_cluster_public_hostname }}"
+
+# Groups and its associated Users
+  groups:
+
+  # Developer Leads
+  - name: project-groups
+    members:
+    - dude1
+
+# Test to add cluster ADMIN local account test
+  - name: AD-ADMIN-Account
+    members:
+
+  # OpenShift Engineers (Operators) with Edit Role
+  - name: ocp-engineers
+    members:
+    - dude2
+
+  # OpenShift Admins with Cluster-Admin Role
+  - name: localadmins
+    members:
+    - dude3
+    - admin
+
+  resource_path:
+  - resources
+
+  cluster_resources:
+# ClusterRole for imagestream management, assigned to paas-engineers to manage the openshift project.
+  - clusterroles/imagestream-manager.yml
+ 
+  cluster_role_bindings:
+# Standard built-in accounts used on OCP for cluster-admin role + additional group admins  
+  - role: custom-cluster-admin
+    users: {}
+    groups:
+    - admins
+    - AD-ADMIN-Account
+    remove_unlisted: true
+
+#  - role: edit
+#    groups:
+#    - edit-devs
+#    remove_unlisted: true
+
+# image-pruner service account for running `oc prune images`
+  - role: system:image-pruner
+    users:
+    - system:serviceaccount:default:image-pruner
+    remove_unlisted: true
+
+# Remove self provisioner role from authenticated users. Only users belonging to the 'users' group are allowed.
+# This ensures that all users with self-provisioner also have quotas/limits set.
+  - role: self-provisioner
+    users: {}
+    groups: {}
+    remove_unlisted_users: true
+    remove_unlisted_groups: true
+
+# Projects created by Ansible Openshift installer
+  projects:
+  # Default Project
+  - name: default
+    description: >
+      OpenShift Infrastructure Project (Router, Registry, Registry-Console, Kubernetes)
+#    node_selector: node-role.kubernetes.io/infra=true
+
+    service_accounts:
+    - name: base-image-pusher
+    - name: image-pruner
+
+    role_bindings:
+    - role: view
+      groups:
+      - ops-engineers
+
+# Projects to pre-define 
+# Test Project 101
+  - name: test101
+    description: >
+      test application project
+    display_name: test101
+    labels:
+      name: test101
+      application: test101
+
+  # OpenShift Project
+  - name: openshift
+    description: >
+      OpenShift Globally Accessible Resources (templates, image streams)
+
+    role_bindings:
+    - role: imagestream-manager
+      groups:
+       - devops
+ #   - role: system:image-builder
+ #     users:
+ #     - system:serviceaccount:jenkins:builder
+
+    - role: registry-viewer
+      users:
+      - system:unauthenticated
+
+    - role: view
+      groups:
+      - qa-engineers
+
+    resources:
+    - imagestreams/rhel7.yml.j2
+
+  # OpenShift-Infra Project
+  - name: openshift-infra
+    description: >
+      OpenShift Infrastructure Project
+
+  # OpenShift-Node Project
+  - name: openshift-node
+    description: >
+      OpenShift Node Project
+
+  # OpenShift-Web-Console Project
+  - name: openshift-web-console
+    description: >
+      OpenShift Web Console Infrastructure (WebUI)
+
+  # Management-Infra Project
+  - name: management-infra
+    description: >
+      Management Infrastructure (Cluster Reader Services)
+
+  # Kube-Public Project
+  - name: kube-public
+    description: >
+      Kubernetes Public Resources
+
+  # Kube-System Project
+  - name: kube-system
+    description: >
+      Kubernetes System Resources
+
+  # Openshift CLI Project
+  - name: openshift-console
+    description: >
+      OpenShift CLI Console
+
+  # Openshift Logging Project
+  - name: openshift-logging
+    description: >
+      OpenShift Logging Infrastructure (Kibana, ElasticSearch, Hawkular Metrics)
+
+  # Openshift Monitoring Project
+  - name: openshift-monitoring
+    description: >
+      OpenShift Cluster Monitoring Infrastructure (Prometheus, Grafana)
+
+  # Openshift SDN Project
+  - name: openshift-sdn
+    description: >
+      OpenShift Cluster Network Infrastructure (OVS)
+
+  # Jenkins Project
+  - name: jenkins
+    description: Global Jenkins Project
+    labels:
+      application: jenkins
+    role_bindings:
+    - role: admin
+      groups:
+      - dev-leads 
+      - admins
+    - role: edit
+      groups:
+      - developers
+
+    resources:
+    - apiVersion: v1
+      kind: ResourceQuota
+      metadata:
+        name: jenkin-req-limit-hard
+      spec:
+        hard:
+          requests.cpu: "2"
+          limits.cpu: "4"
+          requests.memory: "4Gi"
+          limits.memory: "4Gi"
+          requests.storage: "75Gi"
+    - apiVersion: v1
+      kind: LimitRange
+      metadata:
+        name: jenkins-limits
+      spec:
+        limits:
+        - max:
+            cpu: 500m
+            memory: 2Gi
+          min:
+            cpu: 50m
+            memory: 4Mi
+          type: Pod
+        - default:
+            cpu: 500m
+            memory: 2Gi
+          defaultRequest:
+            cpu: 50m
+            memory: 2Gi
+          max:
+            cpu: 500m
+            memory: 2Gi
+          maxLimitRequestRatio:
+            cpu: "10"
+          min:
+            cpu: 50m
+            memory: 4Mi
+          type: Container
+

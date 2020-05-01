@@ -1,0 +1,250 @@
+openshift_clusters:
+- openshift_host_env: "{{ openshift_master_cluster_public_hostname }}"
+
+  projects:
+  - name: testapp-development
+    description:  Template Application Development
+    environment_type: build
+    labels:
+      application: testapp
+      group_master: "true"
+    node_selector: node-role.kubernetes.io/compute=true
+
+    resources:
+    - apiVersion: v1
+      kind: ResourceQuota
+      metadata:
+        name: compute
+      spec:
+        hard:
+          requests.cpu: "1"
+          limits.cpu: "2"
+          requests.memory: "4Gi"
+          limits.memory: "4Gi"
+    - apiVersion: v1
+      kind: LimitRange
+      metadata:
+        name: compute
+      spec:
+        limits:
+        - max:
+            cpu: "2"
+            memory: 4Gi
+          min:
+            cpu: 50m
+            memory: 4Mi
+          type: Pod
+        - default:
+            cpu: 500m
+            memory: 1Gi
+          defaultRequest:
+            cpu: 50m
+            memory: 1Gi
+          max:
+            cpu: "2"
+            memory: 4Gi
+          maxLimitRequestRatio:
+            cpu: "10"
+          min:
+            cpu: 50m
+            memory: 4Mi
+          type: Container
+
+    role_bindings:
+    - role: admin
+      groups:
+      - dev-leads
+      users:
+      - system:serviceaccount:jenkins:jenkins
+      remove_unlisted: true
+    - role: edit
+      groups:
+      - developers
+      remove_unlisted: true
+    - role: view
+      groups:
+      - ops-engineers
+      remove_unlisted: true
+
+  - name: testapp-acceptation
+    description:  Template Application Acceptation
+    environment_type: promotion
+    labels:
+      application: testapp
+    node_selector: node-role.kubernetes.io/compute=true
+
+    resources:
+    - apiVersion: v1
+      kind: ResourceQuota
+      metadata:
+        name: compute
+      spec:
+        hard:
+          requests.cpu: "1"
+          limits.cpu: "2"
+          requests.memory: "4Gi"
+          limits.memory: "4Gi"
+    - apiVersion: v1
+      kind: LimitRange
+      metadata:
+        name: compute
+      spec:
+        limits:
+        - max:
+            cpu: "2"
+            memory: 4Gi
+          min:
+            cpu: 50m
+            memory: 4Mi
+          type: Pod
+        - default:
+            cpu: 500m
+            memory: 1Gi
+          defaultRequest:
+            cpu: 50m
+            memory: 1Gi
+          max:
+            cpu: "2"
+            memory: 4Gi
+          maxLimitRequestRatio:
+            cpu: "10"
+          min:
+            cpu: 50m
+            memory: 4Mi
+          type: Container
+
+    role_bindings:
+    - role: admin
+      groups:
+      - project-leads
+      users:
+      - system:serviceaccount:jenkins:jenkins
+      remove_unlisted: true
+    - role: edit
+      groups:
+      - developers
+      remove_unlisted: true
+    - role: view
+      groups:
+      - ops-engineers
+      remove_unlisted: true
+
+  - name: testapp-integration
+    description:  Template Application Integration
+    environment_type: promotion
+    labels:
+      application: testapp
+    node_selector: node-role.kubernetes.io/compute=true
+
+    resources:
+    - apiVersion: v1
+      kind: ResourceQuota
+      metadata:
+        name: compute
+      spec:
+        hard:
+          requests.cpu: "1"
+          limits.cpu: "2"
+          requests.memory: "4Gi"
+          limits.memory: "4Gi"
+    - apiVersion: v1
+      kind: LimitRange
+      metadata:
+        name: compute
+      spec:
+        limits:
+        - max:
+            cpu: "2"
+            memory: 4Gi
+          min:
+            cpu: 50m
+            memory: 4Mi
+          type: Pod
+        - default:
+            cpu: 500m
+            memory: 1Gi
+          defaultRequest:
+            cpu: 50m
+            memory: 1Gi
+          max:
+            cpu: "2"
+            memory: 4Gi
+          maxLimitRequestRatio:
+            cpu: "10"
+          min:
+            cpu: 50m
+            memory: 4Mi
+          type: Container
+
+    role_bindings:
+    - role: admin
+      groups:
+      - dev-leads
+      users:
+      - system:serviceaccount:jenkins:jenkins
+      remove_unlisted: true
+    - role: edit
+      groups:
+      - developers
+      remove_unlisted: true
+    - role: view
+      groups:
+      - ops-engineers
+      remove_unlisted: true
+
+  - name: testapp-production
+    description:  Template Application Production
+    environment_type: promotion
+    labels:
+      application: testapp
+    node_selector: node-role.kubernetes.io/compute=true
+
+    resources:
+    - apiVersion: v1
+      kind: ResourceQuota
+      metadata:
+        name: compute
+      spec:
+        hard:
+          requests.cpu: "1"
+          limits.cpu: "6"
+          requests.memory: "6Gi"
+          limits.memory: "6Gi"
+    - apiVersion: v1
+      kind: LimitRange
+      metadata:
+        name: compute
+      spec:
+        limits:
+        - max:
+            cpu: "6"
+            memory: 6Gi
+          min:
+            cpu: 50m
+            memory: 4Mi
+          type: Pod
+        - default:
+            cpu: 500m
+            memory: 1Gi
+          defaultRequest:
+            cpu: 50m
+            memory: 1Gi
+          max:
+            cpu: "6"
+            memory: 6Gi
+          maxLimitRequestRatio:
+            cpu: "10"
+          min:
+            cpu: 50m
+            memory: 4Mi
+          type: Container
+
+    role_bindings:
+    - role: admin
+      groups:
+      users:
+      - system:serviceaccount:jenkins:jenkins
+      remove_unlisted: true
+    - role: view
+      groups:
+      remove_unlisted: true

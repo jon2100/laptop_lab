@@ -1,0 +1,68 @@
+# Cluster configuration via role openshift-provision --
+# located at /etc/ansible/roles
+# or ~/installdr/roles
+# This role is maintained externally by Jonathan Kupferer
+# URL: https://github.com/gnuthought/ansible-role-openshift-provision
+- hosts: masters[0] 
+  tasks:
+    - name: "Ensure master dir exists"
+      file:
+        state: directory
+        dest: /tmp/
+    - name: "Copy {{ item }} to master"
+      copy:
+        src: "{{ item }}"
+        dest: /tmp/
+      with_items:
+      - custom-cluster-admin.yml 
+    - name: Creating Cluster Roles
+      shell: /usr/bin/oc apply -f /tmp/custom-cluster-admin.yml
+- name: Removing YML form master
+  hosts: masters[0]
+  tasks:
+    - name: Remove YML
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+      - /tmp/custom-cluster-admin.yml
+
+# Setting self-provisionar to null
+- hosts: masters[0]
+  tasks:
+    - name: "Copying script to master to remove self provision form oauth"
+      copy:
+        src: "{{ item }}"
+        dest: /tmp/
+        mode: '0755'
+      with_items:
+      - rmselfpro.sh
+    - name: "Running Script"
+      shell: /tmp/rmselfpro.sh
+      ignore_errors: true
+# Remove Script
+- hosts: masters[0]
+  tasks:
+    - name: Remove YML
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+      - /tmp/rmselfpro.sh
+
+# runing provision  
+- hosts: masters[0]
+  vars_files:
+  - provision/base/laptop.yml
+  roles:
+  - openshift-provision
+
+# Restarting master API and Controllers
+- hosts: masters[0]
+  tasks:
+    - name: Restarting Master API
+      shell: /usr/local/bin/master-restart api
+      delay: 5
+    - name: Restarting Master Controllers
+      shell: /usr/local/bin/master-restart controllers
+      delay: 5
