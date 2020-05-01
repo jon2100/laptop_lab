@@ -1,0 +1,162 @@
+---
+    - name: Before/after prerequisites.yml
+      hosts: 
+        - masters
+      tasks:
+        - name: "Ensure master dir exists"
+          file:
+            state: directory
+            dest: /etc/origin/master
+        - name: "Copy {{ item }} to master"
+          copy:
+            src: "{{ item }}"
+            dest: /etc/origin/master/
+          with_items:
+          - bindPassword.encrypted
+          - bindPassword.key
+    - name: copy CA for Quay and stuff
+      hosts:
+        - nodes
+      tasks: 
+        - name: "Coping CA for Quay"
+          copy:
+            src: "{{ item }}"
+            dest: /etc/pki/ca-trust/source/anchors/ 
+          with_items:
+          - quayCA.pem
+        - name: Run update-ca-trust
+          shell: |
+            update-ca-trust
+    
+    # Unregistring from Redhat
+    - hosts: nodes
+      tasks:
+        - name: Unregister all nodes 
+          redhat_subscription:
+            state: absent
+    
+    # Setting up for compute registration with RedHat
+    - hosts: compute
+      tasks:
+        - name: Registering with Red Hat Subscription Portal / compute
+          redhat_subscription:
+            force_register: yes
+            state: present
+            username: "{{ RHN_USERNAME }}"
+            password: "{{ RHN_PASSWORD }}"
+            pool_ids: "{{ RHN_SUB_COMPUT_POOL }}"
+          register: result
+          until: result is succeeded
+          retries: 5
+          delay: 5
+          ignore_errors: true
+    
+    # Setting up master or infra registration to RedHat
+    - hosts: masters,infra
+      tasks:
+      - name: Registering with Red Hat Subscription Portal / master and infra
+        redhat_subscription:
+          force_register: yes
+          state: present
+          username: "{{ RHN_USERNAME }}"
+          password: "{{ RHN_PASSWORD }}"
+          pool_ids: "{{ RHN_SUB_MASTERINFRA_POOL }}"
+        register: result
+        until: result is succeeded
+        retries: 5
+        delay: 5
+    
+    # setting up repo
+    - hosts: nodes
+      tasks:
+      - name: Disable all RHSM repositories
+        rhsm_repository:
+          name: '*'
+          state: disabled
+    
+      - name: Enabled repositories for OCP
+        rhsm_repository:
+          name: "{{ item }}"
+        with_items:
+          - rhel-7-server-rpms
+          - rhel-7-server-extras-rpms
+          - rhel-7-server-ose-3.11-rpms
+          - rhel-7-server-ansible-2.6-rpms
+        register: result
+        until: result is succeeded
+        retries: 5 
+        delay: 5 
+    
+    # Deploy yum-utils 
+    - hosts: nodes
+      tasks:
+      - name: install needed utils 
+        yum: state=present name={{ item }}
+        with_items:
+        - yum-utils
+        - NetworkManager
+        - vim 
+        - bash-completion
+        - telnet
+        - nmap-ncat
+        ignore_errors: true
+    
+    # Deploying versionlock
+    # - hosts: nodes
+    #  become: yes
+    #  tasks:
+    #  - name: install version lock
+    #    yum:
+    #      name: yum-plugin-versionlock
+    #      state: present
+    
+    #  - name: copy versionlock.list to hosts
+    #    copy:
+    #      src: /home/ec2-user/versionlock.list
+    #      dest: /etc/yum/pluginconf.d/versionlock.list
+    
+    # running pip to remove urllib3 as there is an error when yum update trys to run
+    # a bug for urllib3 the removal solves the issue
+    # - hosts: nodes
+    #   tasks:
+    #   - name: Pip removing urllib3
+    #     shell: /root/.local/bin/pip uninstall urllib3 -y
+    #     ignore_errors: false 
+    
+    # running updates
+    - name: Custom prerequisites
+      hosts: nodes
+      tasks:
+        - name: Update packages
+          yum:
+            name: '*'
+            state: latest
+     
+        - name: Check if a reboot is required
+          command: needs-restarting -r
+          register: needs_restarting
+          changed_when: false
+          failed_when: needs_restarting.rc > 1
+    
+        # Run the reboot asynchronously and let the managed system wait
+        # for 1 minute before rebooting. If we reboot immediately, the 
+        # SSH connection breaks and the playbook run for this host 
+        # would be aborted.
+        - name: Reboot node
+          command: shutdown -r +1
+          async: 600
+          poll: 0
+          when: needs_restarting.rc == 1
+    
+        - name: Wait for node to come back
+          local_action: wait_for
+          args:
+            host: "{{ ansible_nodename }}"
+            port: 22
+            state: started
+           # Wait for the reboot delay from the previous task plus 10 seconds.
+           # Otherwise, the SSH port would still be open because the system
+           # has not rebooted.
+            delay: 70
+            timeout: 600
+    
