@@ -1,0 +1,4 @@
+# if using standard format names for servers 
+# env_hostname_format: servername${v}0
+# calling inventory/hosts file to use it can be per env inventory.lab etc..
+env_inventory: inventory

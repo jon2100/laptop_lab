@@ -1,0 +1,1 @@
+This directory is needed even if no files are placed in it.
