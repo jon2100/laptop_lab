@@ -1,0 +1,256 @@
+# Remove passowrd before git syncing
+# usage create cjob namespace or a namespace you want this cronjob to run from
+# oc project <new namespace> 
+# oc process -f cronjob-ldap-sync.yaml | oc apply -f-
+---
+kind: "Template"
+apiVersion: "v1"
+metadata:
+  name: "cronjob-ldaps-group-sync"
+  annotations:
+    description: "Scheduled Task to Perform LDAP Group Synchronization"
+    iconClass: "icon-shadowman"
+    tags: "management,cronjob,ldaps,group,sync"
+objects:
+- kind: ConfigMap
+  apiVersion: v1
+  metadata:
+    name: ldap-whitelist
+    labels:
+      template: "cronjob-ldaps-group-sync"
+  data:
+    whitelist.txt: |
+      ${GROUPS_WHITELIST}
+- kind: Secret
+  apiVersion: v1
+  metadata:
+    name: ldap-config-secret
+    annotations:
+      openshift.io/ldap.url: 192.168.99.9:636
+  stringData:
+    ldap-configuration.yaml: |
+      kind: LDAPSyncConfig
+      apiVersion: v1
+      url: ldaps://winad.testnet.net:636 
+      insecure: false
+      bindDN: ${LDAP_BIND_DN}
+      bindPassword:
+        file: /etc/config/bindPassword.encrypted
+        keyFile: /etc/config/bindPassword.key
+      augmentedActiveDirectory:
+          groupsQuery:
+              baseDN: ${LDAP_GROUPS_SEARCH_BASE}
+              scope: sub
+              derefAliases: never
+              pageSize: 0
+          groupUIDAttribute: dn
+          groupNameAttributes: [ cn ]
+          usersQuery:
+              baseDN: ${LDAP_USERS_SEARCH_BASE}
+              scope: sub
+              derefAliases: never
+              pageSize: 0
+              filter: ${LDAP_USERS_FILTER}
+          userNameAttributes: [ sAMAccountName ]
+          groupMembershipAttributes: [ memberOf ]
+- kind: "CronJob"
+  apiVersion: "batch/v1beta1"
+  metadata:
+    name: "${JOB_NAME}"
+    labels:
+      template: "cronjob-ldap-group-sync"
+  spec:
+    schedule: "${SCHEDULE}"
+    concurrencyPolicy: "Forbid"
+    successfulJobsHistoryLimit: "${{SUCCESS_JOBS_HISTORY_LIMIT}}"
+    failedJobsHistoryLimit: "${{FAILED_JOBS_HISTORY_LIMIT}}"
+    jobTemplate:
+      spec:
+        template:
+          spec:
+            containers:
+              - name: "${JOB_NAME}"
+                image: "docker-registry.default.svc:5000/cjobs/adsyncon"
+                command:
+                  - "/bin/bash"
+                  - "-c"
+                  - "oc adm groups prune --sync-config=/etc/config/ldap-group-sync/ldap-group-sync.yaml --confirm && oc adm groups sync --sync-config=/etc/config/ldap-group-sync/ldap-group-sync.yaml --whitelist=/etc/config/whitelist/whitelist.txt --confirm || :"
+                volumeMounts:
+                  - mountPath: "/etc/config/whitelist/"
+                    name: "ldap-whitelist-volume"
+                  - mountPath: "/etc/config/ldap-group-sync/"
+                    name: "ldap-config-volume"
+            volumes:
+              - configMap:
+                  name: ldap-whitelist
+                  items:
+                  - key: whitelist.txt
+                    path: whitelist.txt
+                name: ldap-whitelist-volume
+              - secret:
+                  secretName: ldap-config-secret
+                  items:
+                  - key: ldap-configuration.yaml
+                    path: ldap-group-sync.yaml
+                name: ldap-config-volume
+            restartPolicy: "Never"
+            terminationGracePeriodSeconds: 30
+            activeDeadlineSeconds: 500
+            dnsPolicy: "ClusterFirst"
+            serviceAccountName: "${JOB_SERVICE_ACCOUNT}"
+            serviceAccount: "${JOB_SERVICE_ACCOUNT}"
+- kind: ClusterRole
+  apiVersion: v1
+  metadata:
+    name: ldap-group-syncer
+    labels:
+      template: "cronjob-ldap-group-sync"
+  rules:
+    - apiGroups:
+        - ""
+        - user.openshift.io
+      resources:
+        - groups
+      verbs:
+        - get
+        - list
+        - create
+        - update
+        - delete
+    - apiGroups:
+      - rbac.authorization.k8s.io
+      attributeRestrictions: null
+      resources:
+      - clusterrolebindings
+      - rolebindings
+      - roles
+      verbs:
+      - create
+      - get
+      - list
+      - patch
+      - update
+    - apiGroups:
+      - ""
+      - authorization.openshift.io
+      attributeRestrictions: null
+      resources:
+      - clusterrolebindings
+      - rolebindings
+      - roles
+      verbs:
+      - create
+      - get
+      - list
+      - patch
+      - update
+- kind: ClusterRoleBinding
+  apiVersion: v1
+  groupNames: null
+  metadata:
+    name: system:ldap-group-syncers
+    labels:
+      template: "cronjob-ldap-group-sync"
+  roleRef:
+    name: ldap-group-syncer
+  subjects:
+  - kind: ServiceAccount
+    name: ${JOB_SERVICE_ACCOUNT}
+  userNames:
+  - system:serviceaccount:${NAMESPACE}:${JOB_SERVICE_ACCOUNT}
+- kind: ServiceAccount
+  apiVersion: v1
+  metadata:
+    name: ${JOB_SERVICE_ACCOUNT}
+    labels:
+      template: "cronjob-ldap-group-sync"
+parameters:
+  - name: "NAMESPACE"
+    displayName: "Namespace"
+    description: "Name of the Namespace where to deploy the Scheduled Job"
+    value: "cjobs"
+    required: true
+  - name: "JOB_NAME"
+    displayName: "Job Name"
+    description: "Name of the Scheduled Job to Create."
+    value: "cronjob-ldap-group-sync"
+    required: true
+  - name: "SCHEDULE"
+    displayName: "Cron Schedule"
+    description: "Cron Schedule to Execute the Job"
+    value: "*/5 * * * *"
+    required: true
+  - name: "JOB_SERVICE_ACCOUNT"
+    displayName: "Service Account Name"
+    description: "Name of the Service Account To Execute the Job As."
+    value: "ldap-group-syncer"
+    required: true
+  - name: "SUCCESS_JOBS_HISTORY_LIMIT"
+    displayName: "Successful Job History Limit"
+    description: "The number of successful jobs that will be retained"
+    value: "5"
+    required: true
+  - name: "FAILED_JOBS_HISTORY_LIMIT"
+    displayName: "Failed Job History Limit"
+    description: "The number of failed jobs that will be retained"
+    value: "5"
+    required: true
+  - name: "LDAP_URL"
+    displayName: "LDAP Server URL"
+    description: "URL of you LDAP server"
+    required: true
+    value: "ldap://winad.testnet.net"
+  - name: "LDAP_BIND_DN"
+    displayName: "LDAP Bind User's DN"
+    description: "The Full DN for the user you wish to use to authenticate to LDAP"
+    required: true
+    value: "CN=ocpsrvacct,OU=nonprod,OU=service_accounts,OU=Groups,DC=testnet,DC=net"
+  - name: "LDAP_BIND_PASSWORD"
+    displayName: "LDAP Bind User's password"
+    description: "Password for the LDAP_BIND_DN user"
+    required: true
+    value: "<no pass needed if using paaword files>"
+  - name: "LDAP_GROUPS_SEARCH_BASE"
+    displayName: "Group search query"
+    description: "Location in LDAP tree where you will find groups"
+    required: true
+    value: "OU=Groups,DC=testnet,DC=net"
+  - name: "LDAP_USERS_SEARCH_BASE"
+    displayName: "User search query"
+    description: "Location in LDAP tree where you will find users"
+    required: true
+    value: "DC=testnet,DC=net"
+  - name: "LDAP_USERS_FILTER"
+    displayName: "Users filter"
+    required: true
+    value: " (|(memberOf=CN=IT-ENT-Admins,OU=Protected,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net)(memberOf=CN=devops,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net)(memberOf=CN=devs-adm-1,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net)(memberOf=CN=devs-adm-2,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net)(memberOf=CN=devs-adm-3,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net)(memberOf=CN=devs-edit-1,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net)(memberOf=CN=devs-edit-2,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net)(memberOf=CN=devs-edit-3,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net)(memberOf=CN=devs-view-1,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net)(memberOf=CN=devs-view-2,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net)(memberOf=CN=devs-view-3,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net)(memberOf=CN=testdevs,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net))"
+  - name: "GROUPS_WHITELIST"
+    displayName: "Groups to whitelist"
+    required: false
+    value: 
+          CN=devops,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net
+
+          CN=devs-adm-1,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net
+
+          CN=devs-adm-2,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net
+
+          CN=devs-adm-3,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net
+
+          CN=devs-edit-1,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net
+
+          CN=devs-edit-2,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net
+
+          CN=devs-edit-3,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net
+
+          CN=devs-view-1,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net
+
+          CN=devs-view-2,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net
+
+          CN=devs-view-3,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net
+
+          CN=testdevs,OU=ocpdevs,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net
+
+          CN=IT-ENT-Admins,OU=Protected,OU=OCP-Groups,OU=Groups,DC=testnet,DC=net
+
+labels:
+  template: "cronjob-ldap-group-sync"
