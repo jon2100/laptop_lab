@@ -1,0 +1,8 @@
+---
+# backup etcd
+- import_playbook: etcd-backup.yaml  
+
+# defrag
+- import_playbook: etcd-defrag.yaml
+
+

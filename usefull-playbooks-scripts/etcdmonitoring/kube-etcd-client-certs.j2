@@ -1,0 +1,10 @@
+apiVersion: v1
+data:
+  etcd-client-ca.crt: {{ etcd_client_ca | b64encode }} 
+  etcd-client.crt:  {{ etcd_client_crt | b64encode }}
+  etcd-client.key: {{ etcd_client_key  | b64encode }}
+kind: Secret
+metadata:
+  name: kube-etcd-client-certs
+  namespace: openshift-monitoring
+type: Opaque

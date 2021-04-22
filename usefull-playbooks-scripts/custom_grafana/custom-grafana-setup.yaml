@@ -1,0 +1,29 @@
+---
+- hosts: localhost
+  name: Setting up custom Grafana Openshift-logging project
+  vars:
+    cust_grafana_dir: ./custom_grafana_ymls
+  tasks:
+  - name: Setup custom-grafana-dashboard-compute
+    k8s:
+      namespace: openshift-monitoring
+      state: present
+      src: "{{ item }}"
+    loop: 
+      - "{{ cust_grafana_dir }}/custom-grafana-dashboard-compute.yml"
+      - "{{ cust_grafana_dir }}/custom-grafana-dashboard-etcd.yml"
+      - "{{ cust_grafana_dir }}/dashboard-pods.yml" 
+      - "{{ cust_grafana_dir }}/dashboard-capacity.yml"
+      - "{{ cust_grafana_dir }}/dashboard-master-api.yml"
+      - "{{ cust_grafana_dir }}/dashboard-router.yml"
+      - "{{ cust_grafana_dir }}/dashboard-traffic.yml"
+      - "{{ cust_grafana_dir }}/grafana-sa.yml"
+      - "{{ cust_grafana_dir }}/grafana-clusterrolebinding.yml"
+      - "{{ cust_grafana_dir }}/grafana-custom-config-secret.yml"
+      - "{{ cust_grafana_dir }}/grafana-service.yml"
+      - "{{ cust_grafana_dir }}/grafana-route.yml"
+      - "{{ cust_grafana_dir }}/grafana-deployment-added-dashboard.yml"
+#    register: var_output
+#  - name: Debug
+#    debug:
+#      msg: "The following YAML's were applied to the cluster {{ var_output }}"

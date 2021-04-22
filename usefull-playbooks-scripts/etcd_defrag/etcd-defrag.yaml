@@ -1,0 +1,16 @@
+---
+- hosts: masters
+  remote_user: root
+  name: Copy defrag script and run this will be run on one server at a time
+  serial: 1
+  vars:
+    dest_host_tmp: /tmp
+    source_defrag: etcd_defrag
+  tasks:
+    - name: copying script to masters
+      copy:
+        src: "etcd-defrag.sh"
+        dest: "{{ dest_host_tmp }}"
+        mode: 0744
+    - name: Rund defrag
+      shell: "{{ dest_host_tmp }}/etcd-defrag.sh"

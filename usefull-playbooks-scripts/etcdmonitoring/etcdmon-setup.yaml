@@ -1,0 +1,78 @@
+# Creating Cert and Applying it as a secret
+#
+---
+- hosts: localhost
+  tasks:
+    - name: Create working directory
+      file:
+        path: ./etcdworking
+        state: directory
+
+- hosts: masters[0] 
+  tasks:
+    - find: paths="/etc/etcd/ca/" recurse=no patterns="ca.*"
+      register: files_to_copy
+    - fetch: src={{ item.path }} dest=./etcdworking/ flat=yes
+      loop: "{{ files_to_copy.files }}"
+#      with_items: "{{ files_to_copy.files }}"
+
+- hosts: localhost
+  tasks:
+  - name: Create openssl.cnf
+    copy:
+      dest: ./etcdworking/openssl.cnf
+      content: |
+        [ req ]  
+        req_extensions = v3_req  
+        distinguished_name = req_distinguished_name  
+        [ req_distinguished_name ]  
+        [ v3_req ]  
+        basicConstraints = CA:FALSE  
+        keyUsage = nonRepudiation, keyEncipherment, digitalSignature
+        extendedKeyUsage=serverAuth, clientAuth
+  - name: Generate etcd.key
+    shell: openssl genrsa -out ./etcdworking/etcd.key 2048
+  - name: Generate CSR
+    shell: openssl req -new -key ./etcdworking/etcd.key -out ./etcdworking/etcd.csr -subj "/CN=etcd" -config ./etcdworking/openssl.cnf
+  - name: making cert 
+    shell: openssl x509 -req -in ./etcdworking/etcd.csr -CA ./etcdworking/ca.crt -CAkey ./etcdworking/ca.key -CAcreateserial -out ./etcdworking/etcd.crt -days 365 -extensions v3_req -extfile ./etcdworking/openssl.cnf
+- hosts: localhost
+  name: Create secret yaml
+  vars:
+    etcd_client_ca: "{{ lookup('file', playbook_dir + '/etcdworking/ca.crt') }}"
+    etcd_client_crt: "{{ lookup('file', playbook_dir + '/etcdworking/etcd.crt') }}"
+    etcd_client_key: "{{ lookup('file', playbook_dir + '/etcdworking/etcd.key') }}"
+  tasks:
+  - name: debug vars
+    debug:
+      msg: "vars are {{ etcd_client_ca }}, {{ etcd_client_crt }}, {{ etcd_client_key }}"
+  - name: Populate client certs manifest
+    template:
+      src: template/kube-etcd-client-certs.j2
+      dest: etcdworking/kube-etcd-client-certs.yaml
+  - name: Apply client certs manifest
+    k8s:
+      namespace: openshift-monitoring
+      state: present
+      src: etcdworking/kube-etcd-client-certs.yaml
+
+  - name: pulling down CM to patch
+    shell: "oc get cm cluster-monitoring-config -o yaml > etcdworking/cluster-monitoring-config.yaml"
+
+  - name: patching file 
+    shell: |
+      awk '
+      /kind: ConfigMap/ {
+          print "    etcd:"
+          print "      targets:"
+          print "        selector:"
+          print "          openshift.io/component: etcd"
+          print "          openshift.io/control-plane: \"true\""
+      }
+      { print }
+      ' etcdworking/cluster-monitoring-config.yaml > etcdworking/cm-update-cluster-monitoring-config.yaml
+  - name: Updating CM 
+    k8s:
+      namespace: openshift-monitoring
+      state: present
+      src: etcdworking/cm-update-cluster-monitoring-config.yaml

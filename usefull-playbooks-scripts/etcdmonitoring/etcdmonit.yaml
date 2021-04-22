@@ -1,0 +1,7 @@
+---
+etcd-client-ca: "{{ lookup('file', playbook_dir + '/etcdworking/ca.crt') }}"
+etcd-client-crt: "{{ lookup('file', playbook_dir + '/etcdworking/ca.crt') }}"
+etcd-client-key: "{{ lookup('file', playbook_dir + '/etcdworking/etcd.key') }}"
+
+#apple: "{{ lookup('file', '~/cfg/tstvar.txt') }}"
+...
