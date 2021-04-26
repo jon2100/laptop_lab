@@ -26,6 +26,12 @@
       mode: 0744
   - name: Run script on master
     shell: "{{ dest_backup_dir }}/ocp-etcd3-pods-backup.sh /tmp"
+    register: results1
+  
+  - name: Script output 
+    debug:
+      msg: "{{ results1.stdout }}"
+
   - name: Find backup tar.gz from today.
 # Use find to find files since the seconds will not align between the script execution and this playbook.
     find:

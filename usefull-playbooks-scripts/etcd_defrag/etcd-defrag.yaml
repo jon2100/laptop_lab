@@ -14,3 +14,7 @@
         mode: 0744
     - name: Rund defrag
       shell: "{{ dest_host_tmp }}/etcd-defrag.sh"
+      register: results1
+    - name: Resutls
+      debug:
+        msg: "{{ results1 }}"

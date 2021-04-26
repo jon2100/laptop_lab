@@ -7,6 +7,27 @@
 # Version       : 1.0
 #
 
+ETCD_POD_MANIFEST="/etc/origin/node/pods/etcd.yaml"
+ETCD_EP=$(grep https ${ETCD_POD_MANIFEST} | cut -d "/" -f3 )
+MASTER_EXEC="/usr/local/bin/master-exec"
+
+etcd_health_ck=`${MASTER_EXEC} etcd etcd -c "ETCDCTL_API=3 etcdctl --cert=/etc/etcd/peer.crt --key=/etc/etcd/peer.key --cacert=/etc/etcd/ca.crt --endpoints ${ETCD_EP} endpoint health 2>&1" |grep -iow healthy | wc -l`
+if [[ $etcd_health_ck -lt 3 ]]; then
+  echo "etcd healthy"
+  ctl_pln=`oc get nodes | grep -i master | awk '{print $2}' | grep -iwo ready | wc -l`
+  if [[ $ctl_pln -lt 3 ]]; then
+    echo Control plane is not ready
+    exit 0
+  else
+    echo control plane is ready
+  fi
+else
+  echo "etcd unhealty"
+   exit 0
+fi
+echo running scripts 
+
+
 set -euo pipefail
 
 # Check proper inputs
@@ -39,9 +60,6 @@ fi
 # Vars
 HOSTNAME=$(hostnamectl --static)
 TS=$(date +"%F-%H%M%S")
-
-MASTER_EXEC="/usr/local/bin/master-exec"
-ETCD_POD_MANIFEST="/etc/origin/node/pods/etcd.yaml"
 
 ETCD_BCK_DIR="${1}"
 ETCD_DATA_BCK_DIR="etcd_data_bck.${TS}"
@@ -95,7 +113,7 @@ backup_data() {
 
   log "Backing up ETCD data, performing snapshot."
   # etcd endpoint 
-  ETCD_EP=$(grep https ${ETCD_POD_MANIFEST} | cut -d '/' -f3)
+  #ETCD_EP=$(grep https ${ETCD_POD_MANIFEST} | cut -d '/' -f3)
 
   # snapshot output is /var/lib/etcd/ because is mounted from the host, and we can move it later to another host folder.
   # > /usr/local/bin/master-exec etcd etcd /bin/bash -c "ETCDCTL_API=3 /usr/bin/etcdctl \
