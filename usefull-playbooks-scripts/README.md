@@ -6,6 +6,7 @@ For Python2:
  - python2-jmespath-0.9.0-6.el7_7.noarch  
  - python2-openshift.noarch  
  - python-passlib-1.6.5-1.1.el7.noarch
+ - python-dns.noarch
 
 For Python3
  - libselinux-python3.x86_64
@@ -33,8 +34,6 @@ docker_logging - (Sets options for log retention for the docker deamon)
 docker_runck - (Starts and enables docker.service and atomic-openshift-node.service if it is not set already) 
 
 pv_term - (removes pvs stuck in terminatin by setting finilizers to null)
-
-rm_twistlock - (Removes twistlock - SSC, clusterrolebindings, clusterrole, namespace)
 
 cluster-backup - (Backsup etcd, /etc/orgin , certs, projects, retains 3 days (changeable)
 
