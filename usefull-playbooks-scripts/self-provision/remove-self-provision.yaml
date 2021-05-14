@@ -1,0 +1,36 @@
+---
+# Setting self-provisionar to null
+- hosts: localhost
+  gather_facts: no
+  
+  tasks:
+  - name: removing clusterrolebinding self-provisioning
+    k8s:
+      kubeconfig: ~/.kube/config
+      kind: ClusterRoleBinding
+      name: self-provisioners
+      api_version: v1
+      state: absent
+     
+  - name: Applying self-provisionng cluster role 
+    k8s:
+      kubeconfig: ~/.kube/config
+      state: present
+      src: "{{ playbook_dir }}/template/no-self-provision-template.yml"
+
+  - name: Removing ClusterRoleBinding from group
+    shell: oc adm policy remove-cluster-role-from-group self-provisioner system:authenticated:oauth
+    ignore_errors: yes 
+
+- name: Restarting services
+  hosts: masters
+  gather_facts: no 
+  serial: 1 
+  tasks:
+    - name: Restarting Master API
+      shell: /usr/local/bin/master-restart api
+      delay: 5
+    - name: Restarting Master Controllers
+      shell: /usr/local/bin/master-restart controllers
+      delay: 5 
+

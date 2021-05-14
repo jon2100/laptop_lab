@@ -1,0 +1,25 @@
+# Backup OpenShift Container Platform control plane.
+#
+# Backs up the master config, certs, and etcd snapshot taken during the play.
+#
+# variables:
+#   host_dest_dir: Defaults: /tmp/ocp-backup. Can override
+#
+# Usage:
+#   ansible-playbook 50-backup.yml
+#
+# Override the path backups are copied to:
+#   ansible-playbook 50-backup.yml -e host_dest_dir='/root/ocp-backup'
+---
+- name: login in
+  hosts: masters[0]
+  environment:
+    kubeconfig: ~/.kube/config.json
+  
+# Backup master
+- import_playbook: backup-restore/master-backup-kube.yaml
+#- import_playbook: backup-restore/master-backup.yaml
+- import_playbook: backup-restore/etcd-backup.yaml
+- import_playbook: backup-restore/master-ocp-all.yaml
+- import_playbook: backup-restore/nodes-ocp-all.yaml
+- import_playbook: backup-restore/removeold.yaml 

@@ -56,23 +56,7 @@
       state: present
       src: etcdworking/kube-etcd-client-certs.yaml
 
-  - name: pulling down CM to patch
-    shell: "oc get cm cluster-monitoring-config -o yaml > etcdworking/cluster-monitoring-config.yaml"
-
-  - name: patching file 
-    shell: |
-      awk '
-      /kind: ConfigMap/ {
-          print "    etcd:"
-          print "      targets:"
-          print "        selector:"
-          print "          openshift.io/component: etcd"
-          print "          openshift.io/control-plane: \"true\""
-      }
-      { print }
-      ' etcdworking/cluster-monitoring-config.yaml > etcdworking/cm-update-cluster-monitoring-config.yaml
-  - name: Updating CM 
-    k8s:
-      namespace: openshift-monitoring
-      state: present
-      src: etcdworking/cm-update-cluster-monitoring-config.yaml
+# Applying template for CM cluster-monitoring-config 
+  - name: patch cluster-monitoring-config CM
+    k8s:  
+      src: template/cluster-monitoring-config.yaml

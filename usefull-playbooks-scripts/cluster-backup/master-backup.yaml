@@ -1,0 +1,63 @@
+---
+#perform validation check: ansible-playbook  --syntax-check /root/master-backup.yaml
+#sample invocation: ansible-playbook -i /etc/ansible/hosts /root/master-backup.yaml
+
+- hosts: masters
+  remote_user: root
+  vars:
+    #Directory that will be backed up on each master
+    source_backup_dir: /etc/origin/master
+    #Prefix of the generated tar.gz file
+    tar_file_prefix: certs-and-keys
+    #Temporary location where the tar file will be created.  This file will be removed.
+    dest_backup_dir: /tmp
+    #Location (on the Ansible host) where the tar will be copied.
+    #This parameter should be updated to use a location that's backed up on the host.
+    host_dest_dir: /tmp/ocp-backup
+    # file name for backups
+    file_name_bkup: "{{ tar_file_prefix }}-{{ inventory_hostname }}-{{ ansible_date_time.date }}"
+
+  #Run the backup steps, NOTE this was written vs Ansible 2.2, so the archive task does not exist.
+  tasks:
+    #So we'll need to copy the files first, then create the tar ... or
+    #Create the tar then compress the tar
+  - name: Backup master certs (*.crt)
+    shell: "tar cf {{ dest_backup_dir }}/{{ file_name_bkup }}.tar *.crt*"
+    args:
+      chdir: "{{ source_backup_dir }}"
+  - name: Backup master-config.yaml
+    shell: "tar rf {{ dest_backup_dir }}/{{ file_name_bkup }}.tar master-config.yaml"
+    args:
+      chdir: "{{ source_backup_dir }}"
+  - name: Backup Serial if exists
+    stat: 
+      path: "{{ source_backup_dir }}/ca.serial.txt"
+    register: file_exists
+  - name: Backup serial txt (*.txt)
+    shell: "tar rf {{ dest_backup_dir }}/{{ file_name_bkup }}.tar *.txt"
+    args: 
+      chdir: "{{ source_backup_dir }}"
+    when: file_exists == true
+
+  - name: Backup master keys (*.key)
+    shell: "tar rf {{ dest_backup_dir }}/{{ file_name_bkup }}.tar *.key"
+    args:
+      chdir: "{{ source_backup_dir }}"
+  - name: Compress tar file to create tar.gz
+    shell: "gzip -f {{ dest_backup_dir }}/{{ file_name_bkup }}.tar"
+    args:
+      chdir: "{{ source_backup_dir }}"
+  - name: Remove old tar file
+    file:
+      path: "{{ dest_backup_dir }}/{{ file_name_bkup }}.tar"
+      state: absent
+      recurse: no
+  - name: Copy backup tar.gz back to ansible host machine at {{ host_dest_dir }}
+    fetch:
+      src: "{{ dest_backup_dir }}/{{ file_name_bkup }}.tar.gz"
+      dest: "{{ host_dest_dir }}/"
+  - name: Remove temp tar.gz file from master
+    file:
+      path: "{{ dest_backup_dir }}/{{ file_name_bkup }}.tar.gz"
+      state: absent
+      recurse: no

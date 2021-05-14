@@ -1,7 +1,7 @@
 Setting up ETCD Monitoring.  
 1. Directory layout  
   a. etcdmonit.yaml place in your vars directory tipically inventory/group_vars/{subdir}/  
-  b. kube-etcd-client-certs.j2 place this in your template directory  
+  b. template directory for this playbook provided, if changed it will need to be changed in the playbook 
   c. etcdmon-setup.yaml place where you run playbooks from tipically playbook_dir  
 2. Insure correct directory call out in files, the etcdworking is a directory that gets created to do all the work in and keep your playbook_dir clean
 3. run playbook etcdmon-setup.yaml  

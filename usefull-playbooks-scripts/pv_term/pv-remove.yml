@@ -1,0 +1,18 @@
+---
+- hosts: local
+  gather_facts: no
+
+  tasks:
+    - name: Identifiy stuck in terminating PV's
+      command: oc get pv | grep -i "terminating" | awk '{print $1}'
+      register: stalledpv
+
+    - name: Remove stalled pv
+      k8s:
+        api_version: v1
+        kind: PersistantVolume
+        metadata:
+          name: "{{ item }}"
+          finalizers: null
+      loop:
+      - "{{ stalledpv }}"

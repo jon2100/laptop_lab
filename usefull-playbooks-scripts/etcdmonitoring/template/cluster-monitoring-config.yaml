@@ -1,0 +1,43 @@
+apiVersion: v1
+data:
+  config.yaml: |
+    prometheusOperator:
+      baseImage: quayrepo.testnet.net/openshift3/ose-prometheus-operator
+      prometheusConfigReloaderBaseImage: quayrepo.testnet.net/openshift3/ose-prometheus-config-reloader
+      configReloaderBaseImage: quayrepo.testnet.net/openshift3/ose-configmap-reloader
+      nodeSelector:
+        node-role.kubernetes.io/infra: "true"
+    prometheusK8s:
+      baseImage: quayrepo.testnet.net/openshift3/prometheus
+      nodeSelector:
+        node-role.kubernetes.io/infra: "true"
+      externalLabels:
+        cluster: openshift.garage.testnet.net
+    alertmanagerMain:
+      baseImage: quayrepo.testnet.net/openshift3/prometheus-alertmanager
+      nodeSelector:
+        node-role.kubernetes.io/infra: "true"
+    nodeExporter:
+      baseImage: quayrepo.testnet.net/openshift3/prometheus-node-exporter
+    grafana:
+      baseImage: quayrepo.testnet.net/openshift3/grafana
+      nodeSelector:
+        node-role.kubernetes.io/infra: "true"
+    kubeStateMetrics:
+      baseImage: quayrepo.testnet.net/openshift3/ose-kube-state-metrics
+      nodeSelector:
+        node-role.kubernetes.io/infra: "true"
+    kubeRbacProxy:
+      baseImage: quayrepo.testnet.net/openshift3/ose-kube-rbac-proxy
+    auth:
+      baseImage: quayrepo.testnet.net/openshift3/oauth-proxy
+    etcd:
+      targets:
+        selector:
+          openshift.io/component: etcd
+          openshift.io/control-plane: "true"
+kind: ConfigMap
+metadata:
+  name: cluster-monitoring-config
+  namespace: openshift-monitoring
+

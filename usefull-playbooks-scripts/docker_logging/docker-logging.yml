@@ -1,0 +1,29 @@
+---
+- hosts: nodes  
+  gather_facts: no
+  serial: 1 
+
+  tasks: 
+    - name: Checking Docker config
+      lineinfile:
+        path: /etc/sysconfig/docker
+        state: present 
+        regexp: ^(OPTIONS=)
+        line: "OPTIONS=' --selinux-enabled --log-driver=json-file --signature-verification=false --log-opt max-size=1M --log-opt max-file=3'"
+      notify: 
+        - Restart Docker
+        - Restart Wait
+    
+  handlers:
+    - name: Restart Docker
+      service:
+        name: docker.service
+        state: restarted
+      
+    - name: Restart Wait 
+      pause:
+        seconds: 90 
+ 
+    
+
+        

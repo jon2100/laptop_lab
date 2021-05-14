@@ -1,0 +1,48 @@
+---
+#perform validation check: ansible-playbook  --syntax-check /root/master-backup.yaml
+#sample invocation: ansible-playbook -i /etc/ansible/hosts /root/master-backup.yaml
+
+- hosts: infra,compute 
+  remote_user: root
+  vars:
+    #Directory that will be backed up on each master
+    source_backup_dir: /etc/origin/master
+    #Prefix of the generated tar.gz file
+    tar_file_prefix: all-files
+    #Temporary location where the tar file will be created.  This file will be removed.
+    dest_backup_dir: /tmp
+    #Location (on the Ansible host) where the tar will be copied.
+    #This parameter should be updated to use a location that's backed up on the host.
+    host_dest_dir: /tmp/ocp-backup
+
+  #Run the backup steps, NOTE this was written vs Ansible 2.2, so the archive task does not exist.
+  tasks:
+    #So we'll need to copy the files first, then create the tar ... or
+    #Create the tar then compress the tar
+  - name: Copy script to master
+    copy:
+      src: "backup_master_node.sh"
+      dest: "{{ dest_backup_dir }}"
+      mode: 0744
+  - name: Run script on master
+    shell: "{{ dest_backup_dir }}/backup_master_node.sh "
+  - name: Find backup tar.gz from today.
+# Use find to find files since the seconds will not align between the script execution and this playbook.
+    find:
+      path: "{{ dest_backup_dir }}"
+      patterns: '{{ tar_file_prefix }}.{{ inventory_hostname }}.*.tar.gz'
+    register: backups
+  - name: Copy backup tar.gz back to ansible host machine
+    fetch:
+      src: "{{ item.path }}"
+      dest: "{{ host_dest_dir }}"
+    loop: "{{ backups.files }}"
+    when: "backups.matched > 0"
+  - name: Remove temp tar.gz file from master
+    file:
+      path: "{{ item.path }}"
+      state: absent
+      recurse: no
+    loop: "{{ backups.files }}"
+    when: "backups.matched > 0"
+

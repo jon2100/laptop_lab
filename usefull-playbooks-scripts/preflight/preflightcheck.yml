@@ -1,0 +1,172 @@
+---
+- hosts: masters[0] 
+  gather_facts: yes
+
+  tasks:
+    - block: 
+       - name: checking for rpms
+         yum:
+           name: 'NetworkManager'
+           state: latest
+       
+    - block:
+        - name: get adapter name
+          debug:
+            var=ansible_default_ipv4
+    
+        - name: set facts for name
+          set_fact:
+            nic_name: "{{ ansible_default_ipv4['interface'] }}"
+
+        - name: lookup  ifcfg for NM conntolled
+          lineinfile:
+            path: /etc/sysconfig/network-scripts/ifcfg-{{ nic_name }}
+            state: present
+            line: "NM_CONTROLLED=yes"
+            
+    # Checking swap 
+    - name: set swap var
+      debug:
+        var=ansible_swaptotal_mb
+    
+    - block:
+        - name: check swap size
+          fail:
+            msg: "Swap Total should be 0 "
+          when: ansible_swaptotal_mb > 0
+
+      rescue:
+        - debug:
+            msg: "WARRNING Remove swap file"
+
+    # Check memory over commit uncomment if needed
+#    - block:
+#        - name: Check for memory over commit is set to 1
+#          slurp:
+#            src: /etc/sysctl.conf
+#          register: mem_commit
+#
+#        - name: setting facts
+#          set_fact:
+#            def_mem_commit: "[vm.overcommit_memory=1]\n"
+#            my_mem_commit: "{{ mem_commit.content | b64decode | regex_findall('vm.overcommit_memory=1') | to_yaml }}"
+#
+#        - name: Checking value
+#          fail:
+#            msg: "vm.overcommit_memory not set"
+#          when: ( def_mem_commit != my_mem_commit )
+
+    # Check ipv4 forwarding in 99-openshift.conf
+    - block:
+        - name: Looking for ipv4 forwarding
+          slurp:
+            src: /etc/sysctl.d/99-openshift.conf
+          register: ipv4_fwd1
+        
+        - name: Looking for ipv4 forwarding
+          slurp:
+            src: /etc/sysctl.conf
+          register: ipv4_fwd2
+        
+        - name: setting fact 
+          set_fact: 
+            deftfwdip: "[net.ipv4.ip_forward=1]\n"
+            my_fwdip1: "{{ ipv4_fwd1.content | b64decode | regex_findall('net.ipv4.ip_forward=1') | to_yaml }}"
+            my_fwdip2: "{{ ipv4_fwd2.content | b64decode | regex_findall('net.ipv4.ip_forward=1') | to_yaml }}"
+           
+#        - name: display value
+#          debug:
+#            msg: "Defult {{ deftfwdip }} file 1 {{ my_fwdip1 }} file 2 {{ my_fwdip2 }}"
+   
+        - name: fail if ipv4 forward is not set 
+          fail:
+            msg: " ipv4 forwarding not set for host {{ inventory_hostname }} "
+          when: ( deftfwdip != my_fwdip1 and deftfwdip != my_fwdip2 )
+      
+      rescue:
+        - debug:
+            msg: "Missing net.ipv4.ip_forward=1 in /etc/sysctl.conf OK if exists in /etc/sysctl.d/99-openshift.conf"
+
+    # checking hostname 
+    - block:
+        - name: Set var for ansible_nodename
+          debug:
+            var=ansible_nodename
+
+        - name: Set var for ansible_fqdn
+          debug:
+            var=ansible_fqdn
+
+        - name: Check if nodename matches fqdn
+          fail:
+            msg: "Host name is not FQDN {{ ansible_fqdn }}"
+          when:  ( ansible_fqdn  !=  ansible_fqdn )
+      rescue:
+        - debug:
+            msg: "The hostname should equal the FQDN"
+    
+    # DNS lookups
+    - block:
+        - name: Getting host IP
+          debug:
+            var=ansible_default_ipv4
+        
+        - name: Forward lookup 
+          set_fact:
+            hostip: "{{ lookup('dig', '{{ inventory_hostname }}' ) }}"
+
+        - name: Evaluate hostname lookup vs hosts IP
+          fail:
+            msg: "Host IP does not match DNS lookup of hostname"
+          when: (ansible_default_ipv4['address'] !=  hostip )
+      
+      rescue:
+        - debug:
+            msg: " Forward lookup DNS not setup properly"
+
+    - block:
+        - name: set my ip fact
+          set_fact:
+            myip: "{{ ansible_default_ipv4['address'] }}"
+        
+        - name: Reverse lookup
+          set_fact:
+            rhostip: "{{ lookup('dig', '{{ myip }}/PTR') }}"
+            myhost: "{{ inventory_hostname }}."
+ 
+        - name: Evaluate PTR with hostname
+          fail:
+            msg: " Host IP does not have proper PTR "
+          when: ( rhostip != myhost )
+      
+      rescue:
+        - debug:
+            msg: " DNS Reverse Lookups not setup correctly"
+    
+    - block:
+        - name: Count search domains
+          debug:
+            msg: "Search domain count: {{ ansible_dns.search | list | length }}"
+    
+        - name: check if domains are over limit
+          fail:
+            msg: "Search domain exceeds allowed limit of 4"
+          when: (ansible_dns.search | list | length >= 5)
+      
+      rescue:
+        - debug:
+            msg: "WARNING! Remove the extra search domains"
+      
+        - name: Count the nameserver lines
+          debug:
+            msg: "Name server count: {{ ansible_dns.nameservers | list | length }}"
+
+    - block:
+        - name: Checking nameserver count is over limit
+          fail:
+            msg: "nameservers exceed allowed limit of 3"
+          when: (ansible_dns.nameservers | list | length > 3)
+      
+      rescue: 
+        - debug:
+            msg: "WARNING too many nameservers"

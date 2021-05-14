@@ -1,0 +1,17 @@
+---
+- hosts: localhost
+  tasks:
+  - name: find backups older then 5 days or older
+    find:
+      paths: /home/dude/cfg/backups
+      pattern: "*"
+      recurse: true
+      age: 3d
+    register: find_backups
+  - name: remove old backups file that were 5 days or older
+    file:
+      path: '{{ item.path }}'
+      state: absent
+    with_items:
+      - "{{ find_backups.files }}"
+
