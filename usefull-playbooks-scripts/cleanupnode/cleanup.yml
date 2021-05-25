@@ -2,7 +2,8 @@
 # Only infra and compute nodes, if masters need to be done they can be added in however it will impact cluster performace etc.. as the etcd will go down and may shift leaders a few times as this will not detect who is the leader and do it last.
 
 - name: Setting Node to unscheduled 
-  hosts: infra, compute 
+#  hosts: infra, compute 
+  hosts: masters, infra, compute 
   serial: 1
   tasks:
     - name: unscheduleing node
@@ -15,7 +16,13 @@
           spec:
             unschedulable: true
       delegate_to: "{{ groups.masters.0 }}"
-    
+      retries: 20
+      delay: 20
+ 
+    - name: Draining node {{ inventory_hostname }}
+      shell: "oc adm drain {{ inventory_hostname }} --ignore-daemonsets=true --grace-period=5 --delete-local-data"
+      delegate_to: localhost
+ 
     - name: stopping servies
       service: 
         name: "{{ item }}"
@@ -66,6 +73,10 @@
       with_items:
         - docker.service
         - atomic-openshift-node.service
+    
+    - name: Pausing waiting for serivces to come up
+      pause:
+        seconds: 15
 
     - name: Set node schedulable
       k8s:
@@ -77,6 +88,8 @@
           spec:
             unschedulable: false
       delegate_to: "{{ groups.masters.0 }}"
+      retries: 20
+      delay: 20
    
     - name: Check hosts status before continue
       shell: "oc get nodes {{ inventory_hostname }} | grep -iwo ready"
@@ -93,3 +106,8 @@
       until: nodeschedule.stdout == "0"
       retries: 5
       delay: 5
+
+    - name: Pausing waiting for serivces to come up
+      pause:
+        seconds: 45
+

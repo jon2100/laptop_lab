@@ -37,4 +37,4 @@ pv_term - (removes pvs stuck in terminatin by setting finilizers to null)
 
 cluster-backup - (Backsup etcd, /etc/orgin , certs, projects, retains 3 days (changeable)
 
-
+custom-log-curator.yml (Replaces the default logging-curator ConfigMap so that all non-OCP indices are removed every 3 days and OCP indices are removed every 5) 

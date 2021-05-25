@@ -1,0 +1,17 @@
+---
+- hosts: localhost
+  gather_facts: no
+
+  tasks:
+    - name: Remove logging-curator CM
+      k8s:
+        state: absent
+        api_version: v1
+        namespace: openshift-logging
+        name: logging-curator 
+        kind: ConfigMap
+    
+    - name: Adding custom logging-curator CM
+      k8s:
+        state: present
+        src: "{{ playbook_dir }}/new-curator.yml"

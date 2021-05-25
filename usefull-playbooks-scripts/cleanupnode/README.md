@@ -11,6 +11,3 @@ Python2/3 (tested with 3)
 openshift-ansible.noarch <-- version to match your cluster
 python2-jmespath-0.9.0-3.el7.noarch
 python2-openshift.noarch
-
----
-Usage: ansilbe-playbook -i <inventory_file> cleannode/cleanup.yml
