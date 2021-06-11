@@ -2,7 +2,6 @@
 # Only infra and compute nodes, if masters need to be done they can be added in however it will impact cluster performace etc.. as the etcd will go down and may shift leaders a few times as this will not detect who is the leader and do it last.
 
 - name: Setting Node to unscheduled 
-#  hosts: infra, compute 
   hosts: masters, infra, compute 
   serial: 1
   tasks:
@@ -15,13 +14,17 @@
             name: "{{ inventory_hostname }}"
           spec:
             unschedulable: true
-      delegate_to: "{{ groups.masters.0 }}"
+      delegate_to: localhost
+      become: yes
+      become_user: dude
       retries: 20
       delay: 20
  
     - name: Draining node {{ inventory_hostname }}
       shell: "oc adm drain {{ inventory_hostname }} --ignore-daemonsets=true --grace-period=5 --delete-local-data"
       delegate_to: localhost
+      become: yes
+      become_user: dude
  
     - name: stopping servies
       service: 
@@ -35,36 +38,58 @@
     - name: rebooting host to free resources
       reboot:
         msg: "Wating for {{ inventory_hostname }} to come back"
+
+    - pause:
+        prompt: "login to host to watch dri wipe"
     
-    - name: Removing Directories
+    - name: Removing openshift volumes 
       file:
         state: absent
         path: "{{ item }}"
       loop:
       - /var/lib/origin/openshift.local.volumes
-      - /var/lib/docker
 
-    - name: Reset Docker Storage
-      command: docker-storage-setup --reset
-      register: dssreset
+# If Docker is controlling the mount/setup of the storage comment the two and uncomment the blocks commented out about not in fstab
 
-    - name: Reset output
-      debug:
-        msg: "Reset docker storage {{ dssreset }}"
+    - name: get Docker Directories
+      find:
+        paths: /var/lib/docker
+        patterns: '*'
+        file_type: directory
+        hidden: yes
+      register: dockdir
 
-    - name: Docker storage setup 
-      command: docker-storage-setup
-      register: dssetup
-
-    - name: Setup output
-      debug:
-        msg: "Docker Storage Setup {{ dssetup }}"
-
-    - name: Create Directory /var/lib/docker
+    - name: Remove Docker dirs
       file:
-        path: /var/lib/docker
-        state: directory
-       
+        path: "{{ item.path }}"
+        state: absent
+      with_items: "{{ dockerdir.files }}"
+
+
+# this section  can be uncommented if /dev/lib/docker is not in fstab
+#    - name: Reset Docker Storage
+#      command: docker-storage-setup --reset
+#      register: dssreset
+
+#    - name: Reset output
+#      debug:
+#        msg: "Reset docker storage {{ dssreset }}"
+
+#    - name: Docker storage setup 
+#      command: docker-storage-setup
+#      register: dssetup
+
+#    - name: Setup output
+#      debug:
+#        msg: "Docker Storage Setup {{ dssetup }}"
+
+#    - name: Create Directory /var/lib/docker
+#      file:
+#        path: /var/lib/docker
+#        state: directory
+#      become: yes
+#      become_user: dude
+
     - name: Starting servies
       service: 
         name: "{{ item }}"
@@ -88,12 +113,16 @@
           spec:
             unschedulable: false
       delegate_to: "{{ groups.masters.0 }}"
+      become: yes
+      become_user: dude
       retries: 20
       delay: 20
    
     - name: Check hosts status before continue
       shell: "oc get nodes {{ inventory_hostname }} | grep -iwo ready"
       delegate_to: 127.0.0.1
+      become: yes
+      become_user: dude
       register: nodestate
       until: nodestate.stdout == "Ready"
       retries: 20
@@ -102,6 +131,8 @@
     - name: Check hosts status before continue
       shell: "oc get nodes {{ inventory_hostname }} | grep -iwo SchedulingDisabled | wc -l"
       delegate_to: 127.0.0.1
+      become: yes
+      become_user: dude
       register: nodeschedule
       until: nodeschedule.stdout == "0"
       retries: 5

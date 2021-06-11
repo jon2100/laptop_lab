@@ -5,6 +5,7 @@ Requirements:
 For Python2:  
  - python2-jmespath-0.9.0-6.el7_7.noarch  
  - python2-openshift.noarch  
+ - python2-kubernetes.noarch
  - python-passlib-1.6.5-1.1.el7.noarch
  - python-dns.noarch
 
